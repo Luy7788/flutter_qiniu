@@ -1,7 +1,7 @@
 import 'package:qiniu_flutter_sdk/qiniu_flutter_sdk.dart';
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 
 /// 七牛上传工具类
 class QiNiuManager {

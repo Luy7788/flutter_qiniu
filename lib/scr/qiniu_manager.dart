@@ -2,6 +2,7 @@ import 'package:qiniu_flutter_sdk/qiniu_flutter_sdk.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:qiniu_sdk_base/qiniu_sdk_base.dart' as base;
 
 /// 七牛上传工具类
 class QiNiuManager {
@@ -15,10 +16,13 @@ class QiNiuManager {
   ///uploadFile 上传文件
   ///token 接口返回七牛token
   ///urlPrefix 返回地址需要拼接的前缀
+  ///key 资源名,如果不传则后端自动生成
   ///progress 上传进度
   ///sucCallback 成功回调
   ///failCallback 失败回调
-  void uploadFile(
+  ///retryLimit 失败重试次数
+  ///base.Config 上传配置类，可修改host、配置HttpClientAdapter等
+  PutController uploadFile(
     File uploadFile,
     String token,
     String? urlPrefix,
@@ -26,6 +30,8 @@ class QiNiuManager {
     UploadProgressCallback? progress,
     UploadSucCallback? sucCallback,
     UploadFailCallback? failCallback,
+    int? retryLimit,
+    base.Config? config,
   }) {
     /// storage 对象
     /// storage = Storage(Config(
@@ -38,6 +44,13 @@ class QiNiuManager {
     ///     // 设定网络请求重试次数
     ///     retryLimit: 3,
     ///  ));
+    Storage storage = Storage(
+      config: config ??
+          Config(
+            retryLimit: retryLimit ?? 3, //失败重试次数
+          ),
+    );
+
     /// PutController 控制器，可以用于取消任务、获取上述的状态，进度等信息
     /// 添加任务进度监听
     /// addProgressListener
@@ -46,8 +59,6 @@ class QiNiuManager {
     /// 添加任务状态监听
     /// addStatusListener
     ///
-    Storage storage = Storage();
-
     PutController putController = PutController();
     if (progress != null) {
       putController.addProgressListener((double percent) {
@@ -64,14 +75,14 @@ class QiNiuManager {
     )
       ..then((PutResponse response) {
         if (sucCallback != null) {
-          sucCallback(generateFileName(urlPrefix, key), response.hash ?? "");
+          sucCallback(_generateFileName(urlPrefix, key), response.hash ?? "");
         }
         debugPrint('上传已完成: 原始响应数据: ${jsonEncode(response.rawData)}');
         ;
       })
       ..catchError((dynamic error) {
         if (error is StorageError) {
-          String errorMsg = onError(error);
+          String errorMsg = _onError(error);
           if (failCallback != null) {
             failCallback(error.code, errorMsg);
           }
@@ -82,10 +93,16 @@ class QiNiuManager {
           debugPrint('发生错误: ${error.toString()}');
         }
       });
+    return putController;
+  }
+
+  ///取消上传任务
+  void cancel(PutController controller) {
+    controller.cancel();
   }
 
   ///处理异常
-  String onError(StorageError error) {
+  String _onError(StorageError error) {
     String errorMsg = "上传失败";
     switch (error.type) {
       case StorageErrorType.CONNECT_TIMEOUT:
@@ -117,7 +134,7 @@ class QiNiuManager {
   }
 
   ///获取用户上传头像文件路径
-  String generateFileName(String? urlPrefix, String? key) {
+  String _generateFileName(String? urlPrefix, String? key) {
     return '$urlPrefix' + '/' + '$key';
   }
 }

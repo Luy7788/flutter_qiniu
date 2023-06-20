@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:qiniu_flutter_sdk/qiniu_flutter_sdk.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -65,22 +67,21 @@ class QiNiuManager {
         progress(percent);
       });
     }
-    storage.putFile(
+    Future<base.PutResponse> response = storage.putFile(
       uploadFile,
       token,
       options: PutOptions(
         key: key,
         controller: putController,
       ),
-    )
-      ..then((PutResponse response) {
+    );
+    response.then((PutResponse response) {
         if (sucCallback != null) {
           sucCallback(_generateFileName(urlPrefix, key), response.hash ?? "");
         }
         debugPrint('上传已完成: 原始响应数据: ${jsonEncode(response.rawData)}');
-        ;
       })
-      ..catchError((dynamic error) {
+      .catchError((dynamic error) {
         if (error is StorageError) {
           String errorMsg = _onError(error);
           if (failCallback != null) {
@@ -93,6 +94,70 @@ class QiNiuManager {
           debugPrint('发生错误: ${error.toString()}');
         }
       });
+    return putController;
+  }
+
+
+  ///上传文件数据
+  ///bytes 上传文件数据
+  ///token 接口返回七牛token
+  ///urlPrefix 返回地址需要拼接的前缀
+  ///key 资源名,如果不传则后端自动生成
+  ///progress 上传进度
+  ///sucCallback 成功回调
+  ///failCallback 失败回调
+  ///retryLimit 失败重试次数
+  ///base.Config 上传配置类，可修改host、配置HttpClientAdapter等
+  PutController uploadBytes(
+      Uint8List bytes,
+      String token,
+      String? urlPrefix,
+      String? key, {
+        UploadProgressCallback? progress,
+        UploadSucCallback? sucCallback,
+        UploadFailCallback? failCallback,
+        int? retryLimit,
+        base.Config? config,
+      }) {
+    Storage storage = Storage(
+      config: config ??
+          Config(
+            retryLimit: retryLimit ?? 3, //失败重试次数
+          ),
+    );
+
+    PutController putController = PutController();
+    if (progress != null) {
+      putController.addProgressListener((double percent) {
+        progress(percent);
+      });
+    }
+    storage.putBytes(
+      bytes,
+      token,
+      options: PutOptions(
+        key: key,
+        controller: putController,
+      ),
+    ).then((PutResponse response) {
+      if (sucCallback != null) {
+        sucCallback(_generateFileName(urlPrefix, key), response.hash ?? "");
+      }
+      debugPrint('上传已完成: 原始响应数据: ${jsonEncode(response.rawData)}');
+    })
+        .catchError((dynamic error) {
+      if (error is StorageError) {
+        String errorMsg = _onError(error);
+        if (failCallback != null) {
+          failCallback(error.code, errorMsg);
+        }
+      } else {
+        if (failCallback != null) {
+          failCallback(error.code, error.toString());
+        }
+        debugPrint('发生错误: ${error.toString()}');
+      }
+    });
     return putController;
   }
 
@@ -133,7 +198,7 @@ class QiNiuManager {
     return errorMsg;
   }
 
-  ///获取用户上传头像文件路径
+  ///获取上传文件路径
   String _generateFileName(String? urlPrefix, String? key) {
     return '$urlPrefix' + '/' + '$key';
   }

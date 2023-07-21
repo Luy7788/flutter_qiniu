@@ -152,10 +152,10 @@ class QiNiuManager {
           failCallback(error.code, errorMsg);
         }
       } else {
-        if (failCallback != null) {
-          failCallback(error.code, error.toString());
-        }
         debugPrint('发生错误: ${error.toString()}');
+        if (failCallback != null) {
+          failCallback(-1, error.toString());
+        }
       }
     });
     return putController;
